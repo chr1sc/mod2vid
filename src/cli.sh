@@ -1,0 +1,295 @@
+
+usage() {
+	cat <<EOF
+mod2vid v__VERSION__ -- 2025 by Christian Czinzoll
+Usage: ${0##*/} [OPTIONS] <module file>
+
+Create music videos from tracker modules with pattern visualization
+
+Arguments:
+  <module.it>         Path to a .it/.mod/.xm file for openmpt123
+
+Options:
+  -l, --load-settings <file> Load settings from a file
+  -b, --background <file>    Background image/video (default: $HOME/Videos/bg.webm)
+  -i, --input-audio <file>   Use custom audio file instead of rendering module
+                             (Useful for tracks with VST plugins that need
+                             to be rendered in OpenMPT first)
+  -t, --text "text"          Text overlay displayed at top of video
+  -S, --subtitle-file <file> Play a subtitle file (.ass)
+  -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
+  -n, --normalize            Amplify to 0dbFS
+  -c, --columns <width>      Terminal width in characters (default: 80)
+  -r, --rows <height>        Terminal height in characters (default: 24)
+  -d, --delay <seconds>      Delay before recording starts (0.1-5, default: $DELAY)
+  -s, --skip-term            Skip terminal recording if _term.mp4 exists
+  -N, --no-metadata          Strip all metadata from output video
+  -Q, --no-trackinfo         If no -b was specified, the video will show some track info.
+                             You can turn off this behavior with this switch.
+  -h, --help                 Show this help message
+
+Examples:
+  ${0##*/} song.it -t "Epic Track" -n
+  ${0##*/} -i final.wav -b background.jpg song.mptm
+  ${0##*/} --text "{artist} - {title}" module.mod
+  ${0##*/} -t "Retro" -c 100 -r 30 song.it
+EOF
+	exit 0
+}
+
+parse_args() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			-l|--load-settings) SETTINGS_FILE="$2"; shift 2 ;;
+			-b|--background)
+				BACKGROUND_IMAGE="$2"
+				BACKGROUND_IMAGE_CMDLINE="$2"
+				shift 2 ;;
+			-i|--input-audio) CUSTOM_WAV="$2"; AUDIO="$2"; shift 2 ;;
+			-S|--subtitle-file) SUBTITLE_FILE="$2"; shift 2 ;;
+			-t|--text)
+				TITLE_TEXT="$2"
+				TITLE_TEXT_CMDLINE="$2"
+				shift 2 ;;
+			-g|--gain)        GAIN="$2"; shift 2 ;;
+			-c|--columns)     TERMINAL_COLS="$2"; shift 2 ;;
+			-r|--rows)        TERMINAL_ROWS="$2"; shift 2 ;;
+			-d|--delay)       DELAY="$2"; shift 2 ;;
+			-s|--skip-term)   SKIP_TERM=1; shift ;;
+			-Q|--no-trackinfo)NO_TRACK_INFO=1; shift ;;
+			-N|--no-metadata) META=1; shift ;;
+			-n|--normalize)   NORMALIZE=1; shift ;;
+			-h|--help)        usage; exit 0 ;;
+			--)               shift; POSITIONAL+=("$@"); break ;;
+			-*|--*)           die "Unknown Option: $1" 1 ;;
+			*)                POSITIONAL+=("$1"); shift ;;
+		esac
+	done
+}
+
+bounds_checking() {
+	local val="$1"
+	local min="${2:- -2.0}"
+	local max="${3:- 2.0}"
+	if ! [[ "$val" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+		echo "1.0"
+		return 1
+	fi
+	awk -v val="$val" -v min="$min" -v max="$max" \
+	'BEGIN {
+		printf "%.2f",(val<min)?min:(val>max)?max:val
+	}'
+}
+
+handle_cmdline_overrides() {
+	# command line arguments override template settings
+	if [[ -n "$BACKGROUND_IMAGE_CMDLINE" ]]; then
+		BACKGROUND_IMAGE="$BACKGROUND_IMAGE_CMDLINE"
+	fi
+	if [[ -n "$TITLE_TEXT_CMDLINE" ]]; then
+		TITLE_TEXT="$TITLE_TEXT_CMDLINE"
+	fi
+}
+
+resolve_background_path() {
+	local image_path="$1"
+
+	# try absolute path first
+	[[ -f "$image_path" ]] && {
+		echo "$image_path"
+		return 0
+	}
+
+	# try relative to settings file directory
+	if [[ -n "$SETTINGS_FILE" ]]; then
+		local settings_dir="$(dirname "$(realpath "$SETTINGS_FILE")")"
+		local resolved_path="${settings_dir}/${image_path}"
+		[[ -f "$resolved_path" ]] && {
+			echo "$resolved_path"
+			return 0
+		}
+	fi
+
+	# try relative to execution directory
+	local exec_dir="$(pwd)"
+	local resolved_path="${exec_dir}/${image_path}"
+	[[ -f "$resolved_path" ]] && {
+		echo "$resolved_path"
+		return 0
+	}
+
+	return 1
+}
+
+select_background_image() {
+	# check command-line override first
+	if [[ -n "$BACKGROUND_IMAGE_CMDLINE" ]]; then
+		BACKGROUND_IMAGE="$(resolve_background_path "$BACKGROUND_IMAGE_CMDLINE")" || {
+			die "Could not resolve background image: $BACKGROUND_IMAGE_CMDLINE" 1
+		}
+	# random selection from pool if available
+	elif [[ ${#BACKGROUND_IMAGE_POOL[@]} -gt 0 ]]; then
+		local random_index=$((RANDOM % ${#BACKGROUND_IMAGE_POOL[@]}))
+		local selected_image="${BACKGROUND_IMAGE_POOL[random_index]}"
+
+		BACKGROUND_IMAGE="$(resolve_background_path "$selected_image")" || {
+			warn "Could not resolve pool image '$selected_image', trying next..."
+			unset "BACKGROUND_IMAGE_POOL[random_index]"
+			BACKGROUND_IMAGE_POOL=("${BACKGROUND_IMAGE_POOL[@]}")
+			select_background_image
+			return
+		}
+		echo "Selected random background: $BACKGROUND_IMAGE" >&2
+		# fallback to generated track info
+	else
+		generate_track_info_image "$MODULE" "$BASENAME" || {
+			die "Failed to generate track info image" 1
+		}
+		BACKGROUND_IMAGE="$(realpath "${BASENAME}_info.png")"
+		echo "Using generated track info as background" >&2
+	fi
+
+	ensure_file_readable "$BACKGROUND_IMAGE" || {
+		die "Background image not accessible: $BACKGROUND_IMAGE" 1
+	}
+}
+
+validate_template_variables() {
+	PATTERN_COLOR_BOOST_R=$(bounds_checking $PATTERN_COLOR_BOOST_R -2.0 2.0)
+	PATTERN_COLOR_BOOST_G=$(bounds_checking $PATTERN_COLOR_BOOST_G -2.0 2.0)
+	PATTERN_COLOR_BOOST_B=$(bounds_checking $PATTERN_COLOR_BOOST_B -2.0 2.0)
+}
+
+validate_args() {
+	if [[ ! -f "$TITLE_FONT_FILE" ]]; then
+		warn "Font file not found: $TITLE_FONT_FILE (using default)"
+	fi
+
+	if [[ -n "$SETTINGS_FILE" ]]; then
+		ensure_file_readable "$SETTINGS_FILE"
+		if head -n 1 "$SETTINGS_FILE" | grep -q "^# mod2vid template"; then
+			source "$SETTINGS_FILE"
+		else
+			die "'$SETTINGS_FILE' is not a valid mod2vid settings file (missing header '# mod2vid template')." 1
+		fi
+	fi
+
+	# command line arguments override template settings
+	handle_cmdline_overrides
+
+
+	validate_template_variables
+
+	#get the module name
+	if [[ ${#POSITIONAL[@]} -gt 0 ]]; then
+		MODULE="${POSITIONAL[0]}"
+		if [[ ${#POSITIONAL[@]} -gt 1 ]]; then
+			warn "Extra arguments ignored: ${POSITIONAL[*]:1}"
+		fi
+	fi
+
+	[[ -z "$MODULE" ]] && die "Module file required" 1
+	ensure_file_readable "$MODULE"
+
+	BASENAME="${MODULE%.*}"
+	WAV="${MODULE}.wav"
+	[[ -z "$CUSTOM_WAV" ]] && AUDIO="$WAV"
+
+	if [[ $NORMALIZE -eq 1 && -n $CUSTOM_WAV ]]; then
+		die "Will not normalize (-n) pre-recorded (-i) audio files" 2
+	fi
+	if [[ $NORMALIZE -eq 1 && $GAIN -ne 0 && $SUPPRESS_AUDIO -eq 0 ]]; then
+		die "Normalize (-n) and Gain (-g) collision" 2
+	fi
+	[[ -z "$TITLE_TEXT" ]] && {
+		TITLE_TEXT="$(basename "${BASENAME//_/ }")"
+	}
+
+	# XXX hate to have this inside the validation function
+	TERMVID="${BASENAME}_term.mp4"
+	OUTVID="${BASENAME}.mp4"
+	GEOM="${TERMINAL_COLS}x${TERMINAL_ROWS}"
+
+	# get the module and track info (-t)
+	TRACK_INFO=$(read_openmpt_info "$MODULE");
+
+	TITLE_TEXT="$(build_text "$TITLE_TEXT")"
+	TITLE_TEXT="$(escape_text_for_ffmpeg "$TITLE_TEXT")"
+	echo "${YELLOW}TITLE TEXT: $TITLE_TEXT${RESET}"
+
+	if [[ "$SHOW_LOGO" -eq 1 ]]; then
+		ensure_file_readable "$LOGO_FILE"
+	fi
+	if [[ "$SHOW_SUBTITLES" -eq 1 ]]; then
+		ensure_file_readable "$SUBTITLE_FILE"
+	fi
+	if ! [[ "$GAIN" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+		die "Gain is not a valid number" 2
+	fi
+	# just some arbitrary bounds
+	if ! bc <<< "$GAIN >= -80 && $GAIN <= 80" | grep -q 1; then
+		die "Gain is out of range (-80..80)" 2
+	fi
+	# ditto
+	if (( $(bc <<< "$DELAY < $MIN_DELAY || $DELAY > $MAX_DELAY") )); then
+		die "Delay value must be between $MIN_DELAY and $MAX_DELAY seconds" 2
+	fi
+
+	select_background_image
+
+	case "$EQ_MODE" in
+		bar|dot|line) ;;
+		*)
+			warn "EQ_MODE='$EQ_MODE' invalid, falling back to default 'dot'"
+			EQ_MODE=dot
+			;;
+	esac
+	case "$EQ_FSCALE" in
+		lin|log|rlog) ;;
+		*)
+			warn "EQ_FSCALE='$EQ_FSCALE' invalid, falling back to default 'log'"
+			EQ_FSCALE=log
+			;;
+	esac
+	case "$EQ_ASCALE" in
+		lin|sqrt|cbrt|log) ;;
+		*)
+			warn "EQ_ASCALE='$EQ_ASCALE' invalid, falling back to default 'lin'"
+			EQ_ASCALE=lin
+			;;
+	esac
+	if ! [[ "$EQ_HEIGHT" =~ ^[0-9]+$ ]] || (( EQ_HEIGHT <= 0 )); then
+		warn "EQ_HEIGHT='$EQ_HEIGHT' is not a number"
+		EQ_HEIGHT=200
+	fi
+	if ! [[ "$EQ_WINSIZE" =~ ^[0-9]+$ ]] || (( EQ_WINSIZE <= 0 )); then
+		warn "EQ_WINSIZE='$EQ_WINSIZE' is not a number. Ideally use a power of two"
+		EQ_WINSIZE=512
+	fi
+
+	# currently not in use
+	if ! [[ "$EQ_COL_ALPHA" =~ ^0(\.[0-9]+)?$|^1(\.0*)?$ ]]; then
+		warn "EQ_COLS_ALPHA='$EQ_COL_ALPHA' invalid, falling back to default 0.6"
+		EQ_COL_ALPHA=0.6
+	fi
+	if ! [[ "$EQ_TRANSPOSE" =~ ^[0-7]$ ]]; then
+		warn "EQ_TRANSPOSE='$EQ_TRANSPOSE' invalid falling back to default 0"
+		EQ_TRANSPOSE=0
+	fi
+	case "$SPECTRUM_COLOR" in
+		channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain)
+			;;
+		*)
+			warn "Invalid SPECTRUM_COLOR '$SPECTRUM_COLOR', using default 'channel'"
+			SPECTRUM_COLOR="channel"
+			;;
+	esac
+	case "$OVERVIEW_COLOR" in
+		channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain)
+			;;
+		*)
+			warn "Invalid OVERVIEW_COLOR '$OVERVIEW_COLOR', using default 'channel'"
+			OVERVIEW_COLOR="channel"
+			;;
+	esac
+}
