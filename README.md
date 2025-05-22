@@ -2,6 +2,8 @@
 
 This bash script turns tracker modules into music videos - not the fancy AI-generated ones with touching landscapes and action scenes - just a pattern view before a background image or video and a frequency analyzer at the bottom.
 
+[![mod2vid demo](https://img.youtube.com/vi/awEMUQ_7STY/0.jpg)](https://www.youtube.com/watch?v=awEMUQ_7STY)
+
 ## Features
 
  - pattern visualization (via `openmpt123`)
