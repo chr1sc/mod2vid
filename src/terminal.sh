@@ -31,15 +31,45 @@ start_xvfb() {
 	sleep 1
 }
 
+calculate_max_font_size() {
+	local screen_w=1920 screen_h=1080
+	local cols=$TERMINAL_COLS
+	local rows=$TERMINAL_ROWS
+	local font_aspect=0.5
+	local margin_factor=0.58
+
+	local max_w=$(awk -v sw="$screen_w" -v c="$cols" -v fa="$font_aspect" -v mf="$margin_factor" \
+		'BEGIN { printf "%.0f", sw / (c * fa) * mf }')
+
+	local max_h=$(awk -v sh="$screen_h" -v r="$rows" -v mf="$margin_factor" \
+		'BEGIN { printf "%.0f", sh / r * mf }')
+
+	# Return the smaller value
+	if (( max_w < max_h )); then
+		echo "$max_w"
+	else
+		echo "$max_h"
+	fi
+}
+
 build_xterm_command() {
-	local cmd=(-fa Monospace -fs 10 -geometry "$GEOM")
+
+# 	NUM_CHANNELS=$(openmpt123 --info "$MODULE"|grep ^Channels|awk '{print $2}')
+# 	TERMINAL_COLS=$(( NUM_CHANNELS * 14))
+
+	local max_font_size=$(calculate_max_font_size)
+    if (( $(echo "$TERM_FONT_SIZE > $max_font_size" | bc -l) )); then
+        TERM_FONT_SIZE=$max_font_size
+        echo "TERM_FONT_SIZE: Using safe value: $TERM_FONT_SIZE" >&2
+    fi
+	local cmd=(-fa "Monospace" -fs $TERM_FONT_SIZE -geometry "$GEOM")
 	if [[ "$TERM_THEME" == "white" ]]; then
 		cmd+=(-bg white -fg black -cr black)
 	else
 		cmd+=(-bg black -fg white -cr white)
 	fi
 
-	local mpt_args=(--progress --channel-meters --pattern "$MODULE")
+	local mpt_args=(--progress --channel-meters --pattern "$(printf "%q" "$MODULE")")
 	if [[ "$SUPPRESS_AUDIO" == 1 ]]; then
 		mpt_args+=(--no-meters --gain -80)
 	else
@@ -47,8 +77,9 @@ build_xterm_command() {
 	fi
 
 	local exec_cmd="sleep $DELAY; openmpt123 ${mpt_args[*]}; clear; sleep 2"
-	cmd+=(-e "$exec_cmd")
-	printf '%q ' "${cmd[@]}"
+	cmd+=(-e "bash" "-c" "$(printf "%q" "$exec_cmd")")
+
+	printf '%s ' "${cmd[@]}"
 }
 
 run_xterm() {
@@ -56,7 +87,7 @@ run_xterm() {
 }
 
 detect_window_geometry() {
-	W=800 H=600
+	W=1920 H=1080
 	if WIN_ID=$(xwininfo -root -children | awk '/xterm/ {print $1; exit}'); then
 		eval "$(xwininfo -id "$WIN_ID" | awk -F: '
 			/Width/  { gsub(/^[ \t]+/, "", $2); w=$2 }

@@ -11,7 +11,7 @@ Arguments:
 
 Options:
   -l, --load-settings <file> Load settings from a file
-  -b, --background <file>    Background image/video (default: $HOME/Videos/bg.webm)
+  -b, --background <file>    Background image/video
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
@@ -67,7 +67,7 @@ parse_args() {
 	done
 }
 
-bounds_checking() {
+check_bounds() {
 	local val="$1"
 	local min="${2:- -2.0}"
 	local max="${3:- 2.0}"
@@ -83,9 +83,6 @@ bounds_checking() {
 
 handle_cmdline_overrides() {
 	# command line arguments override template settings
-	if [[ -n "$BACKGROUND_IMAGE_CMDLINE" ]]; then
-		BACKGROUND_IMAGE="$BACKGROUND_IMAGE_CMDLINE"
-	fi
 	if [[ -n "$TITLE_TEXT_CMDLINE" ]]; then
 		TITLE_TEXT="$TITLE_TEXT_CMDLINE"
 	fi
@@ -122,26 +119,28 @@ resolve_background_path() {
 }
 
 select_background_image() {
+
 	# check command-line override first
 	if [[ -n "$BACKGROUND_IMAGE_CMDLINE" ]]; then
 		BACKGROUND_IMAGE="$(resolve_background_path "$BACKGROUND_IMAGE_CMDLINE")" || {
 			die "Could not resolve background image: $BACKGROUND_IMAGE_CMDLINE" 1
 		}
 	# random selection from pool if available
-	elif [[ ${#BACKGROUND_IMAGE_POOL[@]} -gt 0 ]]; then
+	elif [[ ${#BACKGROUND_IMAGE_POOL[@]} -gt 1 ]]; then
 		local random_index=$((RANDOM % ${#BACKGROUND_IMAGE_POOL[@]}))
 		local selected_image="${BACKGROUND_IMAGE_POOL[random_index]}"
 
 		BACKGROUND_IMAGE="$(resolve_background_path "$selected_image")" || {
-			warn "Could not resolve pool image '$selected_image', trying next..."
+			#warn "Could not resolve pool image '$selected_image', trying next..."
 			unset "BACKGROUND_IMAGE_POOL[random_index]"
 			BACKGROUND_IMAGE_POOL=("${BACKGROUND_IMAGE_POOL[@]}")
 			select_background_image
 			return
 		}
 		echo "Selected random background: $BACKGROUND_IMAGE" >&2
-		# fallback to generated track info
-	else
+
+	# fallback
+	elif [[ -z "$BACKGROUND_IMAGE" ]]; then
 		generate_track_info_image "$MODULE" "$BASENAME" || {
 			die "Failed to generate track info image" 1
 		}
@@ -152,12 +151,15 @@ select_background_image() {
 	ensure_file_readable "$BACKGROUND_IMAGE" || {
 		die "Background image not accessible: $BACKGROUND_IMAGE" 1
 	}
+
+	echo "Using Background: $BACKGROUND_IMAGE" >&2
 }
 
 validate_template_variables() {
-	PATTERN_COLOR_BOOST_R=$(bounds_checking $PATTERN_COLOR_BOOST_R -2.0 2.0)
-	PATTERN_COLOR_BOOST_G=$(bounds_checking $PATTERN_COLOR_BOOST_G -2.0 2.0)
-	PATTERN_COLOR_BOOST_B=$(bounds_checking $PATTERN_COLOR_BOOST_B -2.0 2.0)
+	PATTERN_COLOR_BOOST_R=$(check_bounds $PATTERN_COLOR_BOOST_R -2.0 2.0)
+	PATTERN_COLOR_BOOST_G=$(check_bounds $PATTERN_COLOR_BOOST_G -2.0 2.0)
+	PATTERN_COLOR_BOOST_B=$(check_bounds $PATTERN_COLOR_BOOST_B -2.0 2.0)
+	TERM_FONT_SIZE=$(check_bounds "$TERM_FONT_SIZE" 6 36)
 }
 
 validate_args() {
@@ -220,7 +222,7 @@ validate_args() {
 	if [[ "$SHOW_LOGO" -eq 1 ]]; then
 		ensure_file_readable "$LOGO_FILE"
 	fi
-	if [[ "$SHOW_SUBTITLES" -eq 1 ]]; then
+	if [[ -n "$SUBTITLE_FILE" ]]; then
 		ensure_file_readable "$SUBTITLE_FILE"
 	fi
 	if ! [[ "$GAIN" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
@@ -237,44 +239,44 @@ validate_args() {
 
 	select_background_image
 
-	case "$EQ_MODE" in
+	case "$FREQ_MODE" in
 		bar|dot|line) ;;
 		*)
-			warn "EQ_MODE='$EQ_MODE' invalid, falling back to default 'dot'"
-			EQ_MODE=dot
+			warn "FREQ_MODE='$FREQ_MODE' invalid, falling back to default 'dot'"
+			FREQ_MODE=dot
 			;;
 	esac
-	case "$EQ_FSCALE" in
+	case "$FREQ_FSCALE" in
 		lin|log|rlog) ;;
 		*)
-			warn "EQ_FSCALE='$EQ_FSCALE' invalid, falling back to default 'log'"
-			EQ_FSCALE=log
+			warn "FREQ_FSCALE='$FREQ_FSCALE' invalid, falling back to default 'log'"
+			FREQ_FSCALE=log
 			;;
 	esac
-	case "$EQ_ASCALE" in
+	case "$FREQ_ASCALE" in
 		lin|sqrt|cbrt|log) ;;
 		*)
-			warn "EQ_ASCALE='$EQ_ASCALE' invalid, falling back to default 'lin'"
-			EQ_ASCALE=lin
+			warn "FREQ_ASCALE='$FREQ_ASCALE' invalid, falling back to default 'lin'"
+			FREQ_ASCALE=lin
 			;;
 	esac
-	if ! [[ "$EQ_HEIGHT" =~ ^[0-9]+$ ]] || (( EQ_HEIGHT <= 0 )); then
-		warn "EQ_HEIGHT='$EQ_HEIGHT' is not a number"
-		EQ_HEIGHT=200
+	if ! [[ "$FREQ_HEIGHT" =~ ^[0-9]+$ ]] || (( FREQ_HEIGHT <= 0 )); then
+		warn "FREQ_HEIGHT='$FREQ_HEIGHT' is not a number"
+		FREQ_HEIGHT=200
 	fi
-	if ! [[ "$EQ_WINSIZE" =~ ^[0-9]+$ ]] || (( EQ_WINSIZE <= 0 )); then
-		warn "EQ_WINSIZE='$EQ_WINSIZE' is not a number. Ideally use a power of two"
-		EQ_WINSIZE=512
+	if ! [[ "$FREQ_WINSIZE" =~ ^[0-9]+$ ]] || (( FREQ_WINSIZE <= 0 )); then
+		warn "FREQ_WINSIZE='$FREQ_WINSIZE' is not a number. Ideally use a power of two"
+		FREQ_WINSIZE=512
 	fi
 
 	# currently not in use
-	if ! [[ "$EQ_COL_ALPHA" =~ ^0(\.[0-9]+)?$|^1(\.0*)?$ ]]; then
-		warn "EQ_COLS_ALPHA='$EQ_COL_ALPHA' invalid, falling back to default 0.6"
-		EQ_COL_ALPHA=0.6
+	if ! [[ "$FREQ_COL_ALPHA" =~ ^0(\.[0-9]+)?$|^1(\.0*)?$ ]]; then
+		warn "FREQ_COLS_ALPHA='$FREQ_COL_ALPHA' invalid, falling back to default 0.6"
+		FREQ_COL_ALPHA=0.6
 	fi
-	if ! [[ "$EQ_TRANSPOSE" =~ ^[0-7]$ ]]; then
-		warn "EQ_TRANSPOSE='$EQ_TRANSPOSE' invalid falling back to default 0"
-		EQ_TRANSPOSE=0
+	if ! [[ "$FREQ_TRANSPOSE" =~ ^[0-7]$ ]]; then
+		warn "FREQ_TRANSPOSE='$FREQ_TRANSPOSE' invalid falling back to default 0"
+		FREQ_TRANSPOSE=0
 	fi
 	case "$SPECTRUM_COLOR" in
 		channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain)

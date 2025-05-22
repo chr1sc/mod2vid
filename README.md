@@ -14,7 +14,7 @@ You can also create custom themes where you can define the general look of the v
 
 ## Prerequisites
 
-You will need a Linux machine. I've developed this script on Ubuntu Linux, I know it works on a Mint distribution, but I can't tell you if it runs out of the box in WSL. There are hard-coded font-paths that will have to be considered for MacOS.
+I've developed this script on Ubuntu Linux, I know it works on a Mint distribution, but I can't tell you if it runs on any system other than Linux.
 
 Any recent version of bash (4.4?; 5.0?) should do the job, which should be included with most up-to-date Linux systems.
 
@@ -71,7 +71,7 @@ Arguments:
 
 Options:
   -l, --load-settings <file> Load settings from a file
-  -b, --background <file>    Background image/video (default: /home/chr/Videos/bg.webm)
+  -b, --background <file>    Background image/video
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)

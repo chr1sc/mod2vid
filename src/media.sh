@@ -99,17 +99,17 @@ get_filter_complex() {
 		((overlay_count++))
 	fi
 
-	# EQ
-	if [[ "$SHOW_EQ" -eq 1 ]]; then
+	# FREQ
+	if [[ "$SHOW_FREQ" -eq 1 ]]; then
 		filter_complex+="\
-		[0:a]showfreqs=s=${EQ_WIDTH}x${EQ_HEIGHT}:\
-		mode=${EQ_MODE}:\
-		fscale=${EQ_FSCALE}:\
-		ascale=${EQ_ASCALE}:\
-		colors=${EQ_COL_1}@${EQ_COL_ALPHA}|${EQ_COL_2}@${EQ_COL_ALPHA}:\
-		win_size=${EQ_WINSIZE}:\
+		[0:a]showfreqs=s=${FREQ_WIDTH}x${FREQ_HEIGHT}:\
+		mode=${FREQ_MODE}:\
+		fscale=${FREQ_FSCALE}:\
+		ascale=${FREQ_ASCALE}:\
+		colors=${FREQ_COL_1}@${FREQ_COL_ALPHA}|${FREQ_COL_2}@${FREQ_COL_ALPHA}:\
+		win_size=${FREQ_WINSIZE}:\
 		overlap=0[eq];"
-		case "$EQ_TRANSPOSE" in
+		case "$FREQ_TRANSPOSE" in
 			0) filter_complex+="[eq]copy[eq2];" ;;
 			1) filter_complex+="[eq]transpose=1[eq2];" ;;
 			2) filter_complex+="[eq]transpose=1,transpose=1[eq2];" ;;
@@ -118,10 +118,10 @@ get_filter_complex() {
 			5) filter_complex+="[eq]vflip[eq2];" ;;
 			6) filter_complex+="[eq]transpose=1,hflip[eq2];" ;;
 			7) filter_complex+="[eq]transpose=3,vflip[eq2];" ;;
-			*) echo "Ungültiger Wert für EQ_TRANSPOSE: $EQ_TRANSPOSE" >&2; exit 1 ;;
+			*) echo "Ungültiger Wert für FREQ_TRANSPOSE: $FREQ_TRANSPOSE" >&2; exit 1 ;;
 		esac
 		filter_complex+="\
-		${overlay_input}[eq2]overlay=${EQ_POS_X}:${EQ_POS_Y}[vis${overlay_count}];"
+		${overlay_input}[eq2]overlay=${FREQ_POS_X}:${FREQ_POS_Y}[vis${overlay_count}];"
 		overlay_input="[vis${overlay_count}]"
 		((overlay_count++))
 	# no EQ
@@ -134,26 +134,16 @@ get_filter_complex() {
 
 	filter_complex+="\
 		${overlay_input}drawtext=text='${TITLE_TEXT}':\
-		fontcolor=${TITLE_FONT_COLOR}:\
+		fontcolor=${TITLE_FONT_COLOR}@${TITLE_FONT_ALPHA}:\
 		fontsize=${TITLE_FONT_SIZE}:\
 		fontfile=${TITLE_FONT_FILE}:\
-		${TITLE_TEXT_POSITION}:\
+		x=${TITLE_TEXT_POS_X}:y=${TITLE_TEXT_POS_Y}:\
 		shadowx=${TITLE_SHADOW_X}:shadowy=${TITLE_SHADOW_Y}[with_title];"
 
 	# SUBTITLE
-	if [[ "$SHOW_SUBTITLES" -eq 1 ]]; then
+	if [[ -n "$SUBTITLE_FILE" ]]; then
 		filter_complex+="\
-		[with_title]subtitles=filename='${SUBTITLE_FILE}':\
-		force_style='\
-		Fontname=${SUBTITLE_FONT_FILE##*/},\
-		Fontsize=${SUBTITLE_FONT_SIZE},\
-		PrimaryColour=${SUBTITLE_COLOR},\
-		OutlineColour=&H000000,\
-		BackColour=&H80000000,\
-		BorderStyle=3,\
-		Outline=1,\
-		Shadow=1,\
-		Alignment=2'[subtitled];"
+		[with_title]subtitles=filename='${SUBTITLE_FILE}'[subtitled];"
 		overlay_input="[subtitled]"
 	else
 		filter_complex+="[with_title]copy[subtitled];"
@@ -168,7 +158,7 @@ get_filter_complex() {
 		filter_complex+="[subtitled]copy[wm];"
 	fi
 	filter_complex+="\
-		[wm]drawtext=text='github.com/chr1sc/mod2wav':x=4:y=h-th-4:fontsize=20:\
+		[wm]drawtext=text='github.com/chr1sc/mod2vid':x=4:y=h-th-4:fontsize=20:\
       fontcolor=white@0.3:shadowx=2:shadowy=2[outv]"
 
 	echo "${filter_complex}"

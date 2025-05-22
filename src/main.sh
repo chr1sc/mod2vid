@@ -10,8 +10,7 @@ source "$DIR/media.sh"
 source "$DIR/cli.sh
 
 main() {
-	check_environment TOOLS_NEEDED PKGS_NEEDED
-
+	check_environment
 	parse_args "$@"
 	validate_args
 	check_environment
