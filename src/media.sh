@@ -75,7 +75,7 @@ get_filter_complex() {
 	if [[ "$SHOW_OVERVIEW" -eq 1 ]]; then
 		filter_complex+="[0:a]showspectrumpic=s=${OVERVIEW_WIDTH}x${OVERVIEW_HEIGHT}\
 		:scale=log[overview];\
-		${overlay_input}[overview]overlay=${OVERVIEW_POS}[vis${overlay_count}];"
+		${overlay_input}[overview]overlay=${OVERVIEW_POS_X}:${OVERVIEW_POS_Y}[vis${overlay_count}];"
 		overlay_input="[vis${overlay_count}]"
 		((overlay_count++))
 	fi
@@ -225,7 +225,7 @@ compose_final_video() {
 		-i "$AUDIO" \
 		-i "$TERMVID" \
 		"${image_input[@]}" -i "$BACKGROUND_IMAGE" \
-		$( [ "$SHOW_LOGO" -eq 1 ] && echo "-i" "$LOGO_FILE" ) \
+		$( [ -n "$LOGO_FILE" ] && echo "-i" "$LOGO_FILE" ) \
 		"${metadata_flag[@]}" \
 		-filter_complex "$filter_complex" -filter_threads 4 \
 		-map 0:a \

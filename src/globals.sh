@@ -98,7 +98,7 @@ declare -a BACKGROUND_IMAGE_POOL
 : "${SPECTRUM_COLOR:=rainbow}"
 # channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain
 
-: "${SHOW_OVERVIEW:=1}"
+: "${SHOW_OVERVIEW:=0}"
 : "${OVERVIEW_WIDTH:=1180}"
 : "${OVERVIEW_HEIGHT:=40}"
 : "${OVERVIEW_POS_X:=$(( (1920 - OVERVIEW_WIDTH) / 2 ))}"
