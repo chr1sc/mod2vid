@@ -2,7 +2,11 @@
 
 This bash script turns tracker modules into music videos.
 
+<center>
+
 [![mod2vid demo](https://img.youtube.com/vi/awEMUQ_7STY/0.jpg)](https://www.youtube.com/watch?v=awEMUQ_7STY)
+
+</center>
 
 ## Features
 
