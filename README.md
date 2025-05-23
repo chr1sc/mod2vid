@@ -1,22 +1,21 @@
 # mod2vid
 
-This bash script turns tracker modules into music videos - not the fancy AI-generated ones with touching landscapes and action scenes - just a pattern view before a background image or video and a frequency analyzer at the bottom.
+This bash script turns tracker modules into music videos.
 
 [![mod2vid demo](https://img.youtube.com/vi/awEMUQ_7STY/0.jpg)](https://www.youtube.com/watch?v=awEMUQ_7STY)
 
 ## Features
 
  - pattern visualization (via `openmpt123`)
- - headless capturing: you can run it in batches and turn all your mod/med/it/xm/mptm/etc files into videos in one go. Only thing you'll notice currently is the music playing in the background during the video capturing. You can turn this off with the `-S` switch, downside here is that you will not see the VU meters at the top.
+ - headless capturing: run it in batches and turn all your mod/med/it/xm/mptm/etc files into videos in one go. Only thing you'll notice currently is the music playing in the background during the video capturing. You can turn this off with the `-S` switch, downside here is that you will not see the VU meters at the top.
  - support for .ass subtitle files (via `ffmpeg`, which is the workhorse here in general)
  - custom themes
  - normalization of the input audio (`-n`)
-
-You can also create custom themes where you can define the general look of the video.
+ - you can also create custom themes where you can define the general look of the video.
 
 ## Prerequisites
 
-I've developed this script on Ubuntu Linux, I know it works on a Mint distribution, but I can't tell you if it runs on any system other than Linux.
+I've developed this script on Ubuntu Linux, I know it works on Mint, but I can't tell you if it runs on any system other than Linux. Theoretically WSL, cygwin.
 
 Any recent version of bash (4.4?; 5.0?) should do the job, which should be included with most up-to-date Linux systems.
 
@@ -38,10 +37,18 @@ sudo apt install openmpt123 ffmpeg sox imagemagick xterm xvfb x11-utils
 The easiest way to invoke the program and create a video is by typing (The extension `.mptm` is for demostration purposes. Any of the module formats supported by OpenMPT will do):
 
 ```
-$ mod2vid <modname>.mptm
+mod2vid <modname>.mptm
 ```
 
-Test it with a short track (one pattern) because **you might have to calibrate the `DELAY` value**. The default is `1.2` seconds, which means: Wait 1.2 seconds between starting `xterm` and starting `openmpt123`. Depending on the speed of your machine you will notice a delay either in the pattern display or the music.
+Test it with a short track (one pattern) because **you might have to calibrate the `DELAY` value**. The default is `1.0` seconds, which means: Wait 1.2 seconds between starting `xterm` and starting `openmpt123`. Depending on the speed of your machine you will notice a delay either in the pattern display or the music. You can set the delay value either by environment variable or by argument:
+
+```
+DELAY=0.8 mod2vid music.xm
+```
+
+```
+mod2vid music.xm --delay 0.8
+```
 
 This basic invocation will do the following
   - The module will be rendered as wav by `openmpt123`
@@ -62,8 +69,29 @@ You can keep the `<modname>_term.mp4` in case you want to make some changes to t
 
 ## Command Line Options
 
+### Title Templates
+
+|||
+|---|---|
+| Argument    | `-t <title>`, `--title <title>`|
+| Variable    | `TITLE_TEXT`                   |
+| Default     | `{artist} - {title}`           |
+
+If you want to batch process multiple module files it's best to have the video generator know about the module data. There are some template placeholders that you can set. These values are extracted from `openmpt123 --info` output.
+
+| Variable | Description |
+|----------|-------------|
+| {artist} | Composer's name (if set; otherwise '?') |
+| {title}  | Song title (if set; otherwise filename (sans extension)) |
+| {filename}| The complete filename |
+| {size}   | Filesize in human-readable form |
+| {duration} | to the millisecond |
+| {year} | **Unreliable** |
+
+### Usage Output for Reference
+
 ```plaintext
-mod2vid v1.2.0 -- 2025 by Christian Czinzoll
+mod2vid v0.2.2 -- 2025 by Christian Czinzoll
 Usage: mod2vid [OPTIONS] <module file>
 
 Create music videos from tracker modules with pattern visualization
@@ -77,13 +105,13 @@ Options:
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
-  -t, --text "text"          Text overlay displayed at top of video
+  -t, --title "text"          Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
   -n, --normalize            Amplify to 0dbFS
   -c, --columns <width>      Terminal width in characters (default: 80)
   -r, --rows <height>        Terminal height in characters (default: 24)
-  -d, --delay <seconds>      Delay before recording starts (0.1-5, default: 1.2)
+  -d, --delay <seconds>      Delay before recording starts (0.1-5, default: 1.0)
   -s, --skip-term            Skip terminal recording if _term.mp4 exists
   -N, --no-metadata          Strip all metadata from output video
   -Q, --no-trackinfo         If no -b was specified, the video will show some track info.
@@ -92,7 +120,8 @@ Options:
 
 Examples:
   mod2vid song.it -t "Epic Track" -n
-  mod2vid -i final.wav -b background.jpg song.xm
-  mod2vid --text "{artists} - {title}" --no-metadata module.mod
+  mod2vid -i final.wav -b background.jpg song.mptm
+  mod2vid --title "{artist} - {title}" module.mod
   mod2vid -t "Retro" -c 100 -r 30 song.it
+
 ```

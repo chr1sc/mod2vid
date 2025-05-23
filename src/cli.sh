@@ -15,7 +15,7 @@ Options:
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
-  -t, --text "text"          Text overlay displayed at top of video
+  -t, --title "text"          Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
   -n, --normalize            Amplify to 0dbFS
@@ -31,7 +31,7 @@ Options:
 Examples:
   ${0##*/} song.it -t "Epic Track" -n
   ${0##*/} -i final.wav -b background.jpg song.mptm
-  ${0##*/} --text "{artist} - {title}" module.mod
+  ${0##*/} --title "{artist} - {title}" module.mod
   ${0##*/} -t "Retro" -c 100 -r 30 song.it
 EOF
 	exit 0
@@ -47,7 +47,7 @@ parse_args() {
 				shift 2 ;;
 			-i|--input-audio) CUSTOM_WAV="$2"; AUDIO="$2"; shift 2 ;;
 			-S|--subtitle-file) SUBTITLE_FILE="$2"; shift 2 ;;
-			-t|--text)
+			-t|--title)
 				TITLE_TEXT="$2"
 				TITLE_TEXT_CMDLINE="$2"
 				shift 2 ;;
