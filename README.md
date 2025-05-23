@@ -15,7 +15,7 @@ This bash script turns tracker modules into music videos.
 
 ## Prerequisites
 
-I've developed this script on Ubuntu Linux, I know it works on Mint, but I can't tell you if it runs on any system other than Linux. Theoretically WSL, cygwin.
+I've been developing this script on Ubuntu Linux, I know it works on Mint, but I can't tell you if it runs on any system other than Linux. Theoretically WSL, cygwin.
 
 Any recent version of bash (4.4?; 5.0?) should do the job, which should be included with most up-to-date Linux systems.
 
@@ -40,7 +40,7 @@ The easiest way to invoke the program and create a video is by typing (The exten
 mod2vid <modname>.mptm
 ```
 
-Test it with a short track (one pattern) because **you might have to calibrate the `DELAY` value**. The default is `1.0` seconds, which means: Wait 1.2 seconds between starting `xterm` and starting `openmpt123`. Depending on the speed of your machine you will notice a delay either in the pattern display or the music. You can set the delay value either by environment variable or by argument:
+Test it with a short track (one pattern) because **you might have to calibrate the `DELAY` value**. The default is `1.0` seconds, which means: Wait one second between starting `xterm` and starting `openmpt123`. Depending on the speed of your machine you will notice a delay either in the pattern display or the music. You can set the delay value either by environment variable or by argument:
 
 ```
 DELAY=0.8 mod2vid music.xm
@@ -91,7 +91,7 @@ If you want to batch process multiple module files it's best to have the video g
 ### Usage Output for Reference
 
 ```plaintext
-mod2vid v0.2.2 -- 2025 by Christian Czinzoll
+mod2vid v0.2.3 -- 2025 by Christian Czinzoll
 Usage: mod2vid [OPTIONS] <module file>
 
 Create music videos from tracker modules with pattern visualization
@@ -105,7 +105,7 @@ Options:
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
-  -t, --title "text"          Text overlay displayed at top of video
+  -t, --title "text"         Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
   -n, --normalize            Amplify to 0dbFS
@@ -114,8 +114,10 @@ Options:
   -d, --delay <seconds>      Delay before recording starts (0.1-5, default: 1.0)
   -s, --skip-term            Skip terminal recording if _term.mp4 exists
   -N, --no-metadata          Strip all metadata from output video
-  -Q, --no-trackinfo         If no -b was specified, the video will show some track info.
+  -Q, --no-trackinfo         If no background was specified, the video will
+                             show some track info.
                              You can turn off this behavior with this switch.
+  -p, --print-settings       Print current settings, including from template file
   -h, --help                 Show this help message
 
 Examples:
@@ -123,5 +125,4 @@ Examples:
   mod2vid -i final.wav -b background.jpg song.mptm
   mod2vid --title "{artist} - {title}" module.mod
   mod2vid -t "Retro" -c 100 -r 30 song.it
-
 ```

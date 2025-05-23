@@ -150,7 +150,7 @@ get_filter_complex() {
 	fi
 
 	# LOGO BRANCH
-	if [[ "$SHOW_LOGO" -eq 1 ]]; then
+	if [[ -n "$LOGO_FILE" ]]; then
 		filter_complex+="\
 		[4:v]scale=${LOGO_SIZE},format=rgba,colorkey=black:0.1:0.1[logo];\
 		[subtitled][logo]overlay=${LOGO_POSITION}[outv];"
@@ -216,7 +216,7 @@ compose_final_video() {
 	fi
 
 	local metadata_flag=()
-	[[ "$META" -eq 1 ]] && metadata_flag=(-map_metadata -1)
+	[[ "$NO_META" -eq 1 ]] && metadata_flag=(-map_metadata -1)
 
 	local filter_complex=$(get_filter_complex)
 	local map_out="[outv]"

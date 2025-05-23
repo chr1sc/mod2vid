@@ -62,7 +62,7 @@ declare -a BACKGROUND_IMAGE_POOL
 : "${TITLE_FONT_ALPHA:=1.0}"
 : "${TITLE_TEXT_POS_X:=(w-text_w)/2}"
 : "${TITLE_TEXT_POS_Y:=60}"
-: "${TITLE_TEXT:=\{artist\} - \{title\}}"
+: "${TITLE_TEXT:="\{artist\} - \{title\}"}"
 : "${TITLE_SHADOW_X:=4}"
 : "${TITLE_SHADOW_Y:=4}"
 
@@ -91,14 +91,14 @@ declare -a BACKGROUND_IMAGE_POOL
 : "${WAVES_POS_Y:=100}"
 
 : "${SHOW_SPECTRUM:=0}"
-: "${SPECTRUM_POS_X:=0}"
-: "${SPECTRUM_POS_Y:=400}"
 : "${SPECTRUM_WIDTH:=400}"
 : "${SPECTRUM_HEIGHT:=400}"
+: "${SPECTRUM_POS_X:=0}"
+: "${SPECTRUM_POS_Y:=400}"
 : "${SPECTRUM_COLOR:=rainbow}"
 # channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain
 
-: "${SHOW_OVERVIEW:=0}"
+: "${SHOW_OVERVIEW:=1}"
 : "${OVERVIEW_WIDTH:=1180}"
 : "${OVERVIEW_HEIGHT:=40}"
 : "${OVERVIEW_POS_X:=$(( (1920 - OVERVIEW_WIDTH) / 2 ))}"
@@ -113,12 +113,8 @@ declare -a BACKGROUND_IMAGE_POOL
 
 # Subtitle Settings
 : "${SUBTITLE_FILE:=}"
-: "${SUBTITLE_FONT_SIZE:=24}"
-: "${SUBTITLE_COLOR:=&H00FFFFFF}"	# ASS format
-: "${SUBTITLE_FONT_FILE:=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf}"
 
 # Logo settings
-: "${SHOW_LOGO:=0}"
 : "${LOGO_FILE:=}"
 : "${LOGO_SIZE:=200:-1}"	# Width 200px, height auto
 : "${LOGO_POSITION:=20:20}"	# 20px from top-left
@@ -148,6 +144,8 @@ export DISPLAY=":99"
 # COMMAND LINE OVERRIDES
 BACKGROUND_IMAGE_CMDLINE=""
 TITLE_TEXT_CMDLINE=""
+TERMINAL_COLS_CMDLINE=""
+TERMINAL_ROWS_CMDLINE=""
 
 ################################################################################
 # OTHER GLOBALS
@@ -161,12 +159,14 @@ AUDIO_DURATION=0
 BASENAME=""
 GAIN=0
 GEOM=""
-META=0
+NO_META=0
 POSITIONAL=()
 TERMVID=""
 OUTVID=""
 TRACK_INFO=""
 NUM_CHANNELS=0
+PRINT_SETTINGS=0
+TITLE_TEXT_ORIG="$TITLE_TEXT"
 
 RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)

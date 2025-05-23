@@ -15,7 +15,7 @@ Options:
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
-  -t, --title "text"          Text overlay displayed at top of video
+  -t, --title "text"         Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
   -n, --normalize            Amplify to 0dbFS
@@ -24,8 +24,10 @@ Options:
   -d, --delay <seconds>      Delay before recording starts (0.1-5, default: $DELAY)
   -s, --skip-term            Skip terminal recording if _term.mp4 exists
   -N, --no-metadata          Strip all metadata from output video
-  -Q, --no-trackinfo         If no -b was specified, the video will show some track info.
+  -Q, --no-trackinfo         If no background was specified, the video will
+                             show some track info.
                              You can turn off this behavior with this switch.
+  -p, --print-settings       Print current settings, including from template file
   -h, --help                 Show this help message
 
 Examples:
@@ -51,14 +53,25 @@ parse_args() {
 				TITLE_TEXT="$2"
 				TITLE_TEXT_CMDLINE="$2"
 				shift 2 ;;
-			-g|--gain)        GAIN="$2"; shift 2 ;;
-			-c|--columns)     TERMINAL_COLS="$2"; shift 2 ;;
-			-r|--rows)        TERMINAL_ROWS="$2"; shift 2 ;;
-			-d|--delay)       DELAY="$2"; shift 2 ;;
+			-g|--gain)
+				GAIN="$2"; shift 2 ;;
+			-c|--columns)
+				TERMINAL_COLS="$2"
+				TERMINAL_COLS_CMDLINE="$2"
+				shift 2 ;;
+			-r|--rows)
+				TERMINAL_ROWS="$2"
+				TERMINAL_ROWS_CMDLINE="$2"
+				shift 2 ;;
+			-d|--delay)
+				DELAY="$2"
+				DELAY_CMDLINE="$2"
+				shift 2 ;;
 			-s|--skip-term)   SKIP_TERM=1; shift ;;
 			-Q|--no-trackinfo)NO_TRACK_INFO=1; shift ;;
-			-N|--no-metadata) META=1; shift ;;
+			-N|--no-metadata) NO_META=1; shift ;;
 			-n|--normalize)   NORMALIZE=1; shift ;;
+			-p|--print-settings) PRINT_SETTINGS=1; shift ;;
 			-h|--help)        usage; exit 0 ;;
 			--)               shift; POSITIONAL+=("$@"); break ;;
 			-*|--*)           die "Unknown Option: $1" 1 ;;
@@ -85,6 +98,12 @@ handle_cmdline_overrides() {
 	# command line arguments override template settings
 	if [[ -n "$TITLE_TEXT_CMDLINE" ]]; then
 		TITLE_TEXT="$TITLE_TEXT_CMDLINE"
+	fi
+	if [[ -n "$TERMINAL_COLS_CMDLINE" ]]; then
+		TERMINAL_COLS="$TERMINAL_COLS_CMDLINE"
+	fi
+	if [[ -n "$TERMINAL_ROWS_CMDLINE" ]]; then
+		TERMINAL_ROWS="$TERMINAL_ROWS_CMDLINE"
 	fi
 }
 
@@ -179,7 +198,6 @@ validate_args() {
 	# command line arguments override template settings
 	handle_cmdline_overrides
 
-
 	validate_template_variables
 
 	#get the module name
@@ -190,15 +208,27 @@ validate_args() {
 		fi
 	fi
 
-	[[ -z "$MODULE" ]] && die "Module file required" 1
-	ensure_file_readable "$MODULE"
 
-	BASENAME="${MODULE%.*}"
-	WAV="${MODULE}.wav"
+	[[ -z "$MODULE" && "$PRINT_SETTINGS" -ne 1 ]] && {
+		echo "mod2vid -- 2025 Christian Czinzoll"
+		echo "Usage: ${0##*/} [OPTIONS] <modfile>"
+		echo "Use --help for more infos."
+		exit 2
+	}
+
+	# only handle module if given as arg
+	if [[ -n "$MODULE" ]]; then
+		ensure_file_readable "$MODULE"
+		BASENAME="${MODULE%.*}"
+		WAV="${MODULE}.wav"
+		# get the module and track info (-t)
+		TRACK_INFO=$(read_openmpt_info "$MODULE");
+	fi
+
 	[[ -z "$CUSTOM_WAV" ]] && AUDIO="$WAV"
 
 	if [[ $NORMALIZE -eq 1 && -n $CUSTOM_WAV ]]; then
-		die "Will not normalize (-n) pre-recorded (-i) audio files" 2
+		warn "Will not normalize (-n) pre-recorded (-i) audio files"
 	fi
 	if [[ $NORMALIZE -eq 1 && $GAIN -ne 0 && $SUPPRESS_AUDIO -eq 0 ]]; then
 		die "Normalize (-n) and Gain (-g) collision" 2
@@ -212,14 +242,11 @@ validate_args() {
 	OUTVID="${BASENAME}.mp4"
 	GEOM="${TERMINAL_COLS}x${TERMINAL_ROWS}"
 
-	# get the module and track info (-t)
-	TRACK_INFO=$(read_openmpt_info "$MODULE");
-
 	TITLE_TEXT="$(build_text "$TITLE_TEXT")"
 	TITLE_TEXT="$(escape_text_for_ffmpeg "$TITLE_TEXT")"
-	echo "${YELLOW}TITLE TEXT: $TITLE_TEXT${RESET}"
+	[[ -n "$MODULE" ]] && echo "${YELLOW}TITLE TEXT: $TITLE_TEXT${RESET}"
 
-	if [[ "$SHOW_LOGO" -eq 1 ]]; then
+	if [[ -n "$LOGO_FILE" ]]; then
 		ensure_file_readable "$LOGO_FILE"
 	fi
 	if [[ -n "$SUBTITLE_FILE" ]]; then
@@ -237,7 +264,7 @@ validate_args() {
 		die "Delay value must be between $MIN_DELAY and $MAX_DELAY seconds" 2
 	fi
 
-	select_background_image
+	[[ -n "$MODULE" ]] && select_background_image
 
 	case "$FREQ_MODE" in
 		bar|dot|line) ;;
@@ -294,4 +321,9 @@ validate_args() {
 			OVERVIEW_COLOR="channel"
 			;;
 	esac
+
+	if (( PRINT_SETTINGS == 1 )); then
+		print_settings
+		[[ -z "$MODULE" ]] && exit 0
+	fi
 }
