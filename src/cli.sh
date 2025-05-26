@@ -208,9 +208,9 @@ validate_args() {
 		fi
 	fi
 
-
+	# no module nor -p: print usage
 	[[ -z "$MODULE" && "$PRINT_SETTINGS" -ne 1 ]] && {
-		echo "mod2vid -- 2025 Christian Czinzoll"
+		echo "mod2vid __VERSION__"
 		echo "Usage: ${0##*/} [OPTIONS] <modfile>"
 		echo "Use --help for more infos."
 		exit 2

@@ -1,13 +1,5 @@
 
 
-XVFB_PID=""
-cleanup() {
-  # kill Xvfb if running
-  [[ -n "$XVFB_PID" ]] && kill "$XVFB_PID" 2>/dev/null
-  rm -f "$TMP_WAV" "$TERMVID.lock" 2>/dev/null
-}
-
-
 die() {
 	local code=${2:-1}
 	echo "${RED}Error: $1${RESET}" >&2

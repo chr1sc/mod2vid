@@ -1,4 +1,29 @@
+
+# this will ensure more robustness when running multiple instances at the same
+# time
+while true; do
+    DISPLAY_NUM=$(shuf -i 100-999 -n 1)
+    SOCKET="/tmp/.X11-unix/X$DISPLAY_NUM"
+    if [[ ! -e "$SOCKET" ]]; then
+        export DISPLAY=":$DISPLAY_NUM"
+        break
+    fi
+done
+export XVFB_PID=""
+
+# downside is that you shouldn't run them in the same shell concurrently
+# (as in: mod2vid mod1.it & mod2vid mod2.it) as a trap works per
+# shell and the cleanup function will only kill the first of multiple instances
+# leading to many open, uncared for Xvfb sessions.
+cleanup() {
+  # kill Xvfb if running
+  [[ -n "$XVFB_PID" ]] && kill "$XVFB_PID" 2>/dev/null
+  rm -f "$TMP_WAV" "$TERMVID.lock" 2>/dev/null
+  exit
+}
+
 record_terminal() {
+
 	if [[ "$SKIP_TERM" == 1 && -f "$TERMVID" ]]; then
 		echo "Skipping terminal recording (using existing: $TERMVID)"
 		return
@@ -25,12 +50,19 @@ record_terminal() {
 }
 
 start_xvfb() {
-	Xvfb ":99" -screen 0 1920x1080x24 +extension RANDR &>/dev/null &
+	Xvfb "$DISPLAY" -screen 0 1920x1080x24 +extension RANDR &>/dev/null &
 	XVFB_PID=$!
-	#trap 'cleanup' EXIT ERR
+	trap cleanup EXIT INT TERM HUP
 	sleep 1
 }
 
+# Function:    calculate_max_font_size
+# Description: This function makes sure that no matter the number of
+#              cols and rows a user specifies it will fit within the
+#              screen resolution by limiting the font size.
+#              Has not yet been thoroughly tested
+# Globals:     TERMINAL_COLS, TERMINAL_ROWS
+# Outputs      (max_w<max_h)?max_w:max_h
 calculate_max_font_size() {
 	local screen_w=1920 screen_h=1080
 	local cols=$TERMINAL_COLS
@@ -100,7 +132,7 @@ detect_window_geometry() {
 record_x11() {
 	local duration="$1"
 	ffmpeg -hide_banner -y -f x11grab -video_size "${W}x${H}" \
-		-framerate 30 -i ":99+0,0" \
+		-framerate 30 -i "$DISPLAY+0,0" \
 		-pix_fmt yuv420p -c:v libx264 -preset ultrafast \
 		-t "$duration" "$TERMVID"
 }

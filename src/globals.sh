@@ -1,4 +1,5 @@
 ################################################################################
+
 # CONSTANTS AND DEFAULTS
 readonly DEFAULT_DELAY=1.0
 readonly MAX_DELAY=5.0
@@ -10,7 +11,7 @@ readonly MIN_DELAY=0.1
 # faster ones). It refers to the wait time between opening an xterm
 # window and starting openmpt123. The terminal video recorded here may
 # be asynchronous in the final video accordingly. You can modify the
-# value with the --delay|-d option or set the
+# value with the --delay|-d option or set it with DELAY
 : "${DELAY:=$DEFAULT_DELAY}"
 
 # Normalize to this peak
@@ -98,6 +99,7 @@ declare -a BACKGROUND_IMAGE_POOL
 : "${SPECTRUM_COLOR:=rainbow}"
 # channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain
 
+# TODO
 : "${SHOW_OVERVIEW:=0}"
 : "${OVERVIEW_WIDTH:=1180}"
 : "${OVERVIEW_HEIGHT:=40}"
@@ -106,29 +108,30 @@ declare -a BACKGROUND_IMAGE_POOL
 : "${OVERVIEW_COLOR:=nebulae}"
 : "${OVERVIEW_MARKER_COLOR:=red@0.8}"
 
+# Subtitle Settings
+: "${SUBTITLE_FILE:=}"
+
+# Logo settings
+# TODO
+: "${LOGO_FILE:=}"
+: "${LOGO_SIZE:=200:-1}"	# Width 200px, height auto
+: "${LOGO_POSITION:=20:20}"	# 20px from top-left
+
+# Pattern settings
 : "${PATTERN_WIDTH:=-2}"	# pattern view width (-2: keep aspect)
 : "${PATTERN_HEIGHT:=720}"	# pattern view height(-2: keep aspect)
 : "${PATTERN_OFFSET_X:=0}"	# positive value: position right of the center
 : "${PATTERN_OFFSET_Y:=0}"	# positive value: position below the center
 
-# Subtitle Settings
-: "${SUBTITLE_FILE:=}"
-
-# Logo settings
-: "${LOGO_FILE:=}"
-: "${LOGO_SIZE:=200:-1}"	# Width 200px, height auto
-: "${LOGO_POSITION:=20:20}"	# 20px from top-left
-
-
 : "${PATTERN_GAMMA_R:=1.0}"
 : "${PATTERN_GAMMA_G:=1.0}"
 : "${PATTERN_GAMMA_B:=1.0}"
-
 
 : "${PATTERN_COLOR_BOOST_R:=1.0}"
 : "${PATTERN_COLOR_BOOST_G:=1.0}"
 : "${PATTERN_COLOR_BOOST_B:=1.0}"
 # Glow Effect Settings
+# XXX Not working as intended
 : "${PATTERN_GLOW_RADIUS:=0}"		# Blur strength (pixels)
 : "${PATTERN_GLOW_OPACITY:=1.0}"	# 0.0-1.0 (transparent-opaque)
 : "${PATTERN_GLOW_MODE:=screen}"	# Other options: "screen", "lighten"
@@ -138,10 +141,11 @@ declare -a BACKGROUND_IMAGE_POOL
 # video was loaded there will be no track info either
 : "${NO_TRACK_INFO:=0}"
 
-export DISPLAY=":99"
 
 ################################################################################
 # COMMAND LINE OVERRIDES
+# command line parameters override variables (whether set as environment
+# variables directly in the shell or in a settings file)
 BACKGROUND_IMAGE_CMDLINE=""
 TITLE_TEXT_CMDLINE=""
 TERMINAL_COLS_CMDLINE=""
@@ -149,25 +153,40 @@ TERMINAL_ROWS_CMDLINE=""
 
 ################################################################################
 # OTHER GLOBALS
+# skip terminal recording if a _term.mp4 file exists (-s)
 SKIP_TERM=0
 SETTINGS_FILE=""
-MODULE=""
-CUSTOM_WAV=""
-AUDIO=""
-WAV=""
+MODULE="" CUSTOM_WAV="" AUDIO="" WAV=""
+# the duration of the wav file will determine the duration of our final video
 AUDIO_DURATION=0
+# the module name without extension
 BASENAME=""
+# this will hold the normalization value (-n) or a manually set gain value (-g)
 GAIN=0
+# a combined string of terminal cols and rows for xterm running on the virtual x server
 GEOM=""
+# if this flag is set (-N) there will be no meta tags in the output video
 NO_META=0
+# for the argument parser
 POSITIONAL=()
+# the terminal recording will have a suffix _term.mp4
 TERMVID=""
+# the final video
 OUTVID=""
+# output of openmpt123 --info
 TRACK_INFO=""
+# TODO Maybe making the terminal width dependent on the number of channels.
+#      If there are only eight channels and we have 14 (~15) chars per channel
+#      that'd be 120 chars width. But since the pattern view of openmpt123
+#      is restricting itself anyway if it becomes too wide, this option may be
+#      useful only for mods with a lower number of channels
 NUM_CHANNELS=0
 PRINT_SETTINGS=0
+# make a copy of the original string before placeholder replacement
+# for the -p option to print the unchanged value
 TITLE_TEXT_ORIG="$TITLE_TEXT"
 
+# some terminal colors.
 RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)
 YELLOW=$(tput setaf 3)

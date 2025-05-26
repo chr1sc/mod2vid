@@ -1,15 +1,25 @@
 
+# TODO Reduce use of globals in the smaller functions
+
+# Function:    get_media_duration
+# Outputs:     Length of an audio or video in seconds.milliseconds
 get_media_duration() {
 	local file="$1"
 	ffprobe -hide_banner -v error -show_entries format=duration \
 		-of default=nokey=1:noprint_wrappers=1 "$file"
 }
 
+# Function:    is_image_file
+# Returns:     0 on success, otherwise 1
 is_image_file() {
 	local file="$1"
 	file "$file" | grep -qE 'image|bitmap'
 }
 
+# Function:    escape_text_for_ffmpeg
+# Description: Escape some characters that are not allowed inside an
+#              ffmpeg filter complex string
+# Outputs:     the escaped string safe for use in filter_complex
 escape_text_for_ffmpeg() {
     local text="$1"
     if [[ -n "$text" ]]; then
@@ -23,8 +33,10 @@ escape_text_for_ffmpeg() {
     fi
 }
 
+# Function:    get_filter_complex
+# Description: Conditional construction of the filter string
+# Outputs:     filter complex string for ffmpeg
 get_filter_complex() {
-
 	local filter_complex="\
 		[1:v]\
 			lut=\
@@ -74,7 +86,7 @@ get_filter_complex() {
 	# SHOW_OVERVIEW
 	if [[ "$SHOW_OVERVIEW" -eq 1 ]]; then
 		filter_complex+="[0:a]showspectrumpic=s=${OVERVIEW_WIDTH}x${OVERVIEW_HEIGHT}\
-		:scale=log[overview];\
+		:legend=disabled:scale=log[overview];\
 		${overlay_input}[overview]overlay=${OVERVIEW_POS_X}:${OVERVIEW_POS_Y}[vis${overlay_count}];"
 		overlay_input="[vis${overlay_count}]"
 		((overlay_count++))
@@ -164,7 +176,15 @@ get_filter_complex() {
 	echo "${filter_complex}"
 }
 
+# Function:    render_audio
+# Description: Calls openmpt123 to render a module file to wav.
+#              If NORMALIZE==1 the maximum gain is calculated
+#              and openmpt123 is invoked a 2nd time, now with
+#              the new GAIN value
+# Returns
 render_audio() {
+
+	# user provided an audio file (-i): Do nothing
 	[[ -n "$CUSTOM_WAV" ]] && {
 		echo "Using provided audio: $CUSTOM_WAV"
 		return
@@ -178,12 +198,13 @@ render_audio() {
 		# the level of amplification we can apply
 		# TODO RMS instead of simple peak
 		openmpt123 --render --force "$MODULE" 2>&1 >/dev/null
+
 		# calculate peak amplitude
 		local peak=$(sox "$WAV" -n stat 2>&1 | awk '/Maximum amplitude/ {print $3 < 0 ? -$3 : $3}')
 
-		# Calculate gain
 		if (( $(echo "$peak == 0" | bc -l) )); then
 			GAIN=0
+		# Calculate gain
 		else
 			db=$(echo "20*l($peak)/l(10)" | bc -l)
 			GAIN=$(echo "$TARGET_DBFS - $db" | bc | awk '{print int($1 + ($1>0?0.5:-0.5))}')
@@ -203,6 +224,9 @@ render_audio() {
 	openmpt123 --render --force --gain "$GAIN" "$MODULE"
 }
 
+# Function:    compose_final_video
+# Description: The 'main' function of this file, creating the
+#              final video
 compose_final_video() {
 	echo "Creating final video..."
 	AUDIO_DURATION=$(get_media_duration "$AUDIO")
@@ -215,8 +239,10 @@ compose_final_video() {
 		image_input=(-stream_loop -1)
 	fi
 
+	# strip all meta data from the final video
 	local metadata_flag=()
-	[[ "$NO_META" -eq 1 ]] && metadata_flag=(-map_metadata -1)
+	[[ "$NO_META" -eq 1 ]] && \
+		metadata_flag=(-map_metadata -1)
 
 	local filter_complex=$(get_filter_complex)
 	local map_out="[outv]"
@@ -237,18 +263,24 @@ compose_final_video() {
 		"$OUTVID"
 }
 
+# Function:    generate_track_info_image
+# Description: Generates an *_info.png file of a module with some
+#              module infos.
+# Parameters:
+#       $1     the module filename
+#       $2     basename XXX can be derived from $1
+# XXX Exits on error
 generate_track_info_image() {
 	local module_file="$1"
 	local basename="$2"
 	local font="$TITLE_FONT_MONO"
 	local output="${basename}_info.png"
 
-	# just generate a black background
+	# just generate a black background if NO_TRACK_INFO is set
 	if (( NO_TRACK_INFO == 1 )); then
 		if ! convert -size 1920x1080 "${BACKGROUND_COLOR}" \
 					"$output"; then
-			echo "Error: Failed to create image with convert" >&2
-			exit 1
+			die "Error: Failed to create image with convert" 1
 		fi
 		return
 	fi
@@ -257,8 +289,6 @@ generate_track_info_image() {
 				-font "$font" \
 				-pointsize 16 -annotate +10+100 "$TRACK_INFO" \
 				"$output"; then
-		echo "Error: Failed to create image with convert" >&2
-		exit 1
+		die "Error: Failed to create image with convert" 1
 	fi
 }
-

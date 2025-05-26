@@ -9,7 +9,7 @@ get_info_field() {
 	local field="$1"
 	echo "$TRACK_INFO" | awk -F': +' -v key="$field" '
 		{
-			gsub(/^[ \t.]+|[ \t.]+$/, "", $1)
+			gsub(/^[ .]+|[ .]+$/, "", $1)
 			if ($1 == key) print $2
 		}
 	'
