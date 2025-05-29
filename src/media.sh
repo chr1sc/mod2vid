@@ -1,5 +1,5 @@
 
-# TODO Reduce use of globals in the smaller functions
+# TODO Reduce use of globals ... but then, it's Bash
 
 # Function:    get_media_duration
 # Outputs:     Length of an audio or video in seconds.milliseconds
@@ -213,8 +213,6 @@ render_audio() {
 			(( GAIN < -20 )) && GAIN=-20
 		fi
 
-		# no need to render the wav a second time if there is nothing
-		# to gain :D
 		if [[ "$GAIN" -le 0 ]]; then
 			return
 		fi
@@ -269,7 +267,7 @@ compose_final_video() {
 # Parameters:
 #       $1     the module filename
 #       $2     basename XXX can be derived from $1
-# XXX Exits on error
+# Exits on error
 generate_track_info_image() {
 	local module_file="$1"
 	local basename="$2"
@@ -285,6 +283,7 @@ generate_track_info_image() {
 		return
 	fi
 
+	# generate the backgorund with the track info written on it
 	if ! convert -size 1920x1080 "$BACKGROUND_COLOR" -fill white \
 				-font "$font" \
 				-pointsize 16 -annotate +10+100 "$TRACK_INFO" \

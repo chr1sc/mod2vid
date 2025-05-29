@@ -2,8 +2,9 @@
 
 # CONSTANTS AND DEFAULTS
 readonly DEFAULT_DELAY=1.0
-readonly MAX_DELAY=5.0
-readonly MIN_DELAY=0.1
+readonly MAX_DELAY=10.0
+# Delay can be negative
+readonly MIN_DELAY=-9.9
 
 # DELAY
 # This value is important.  Depending on the speed of your computer, this
@@ -150,6 +151,7 @@ BACKGROUND_IMAGE_CMDLINE=""
 TITLE_TEXT_CMDLINE=""
 TERMINAL_COLS_CMDLINE=""
 TERMINAL_ROWS_CMDLINE=""
+OUTVID_CMDLINE=""
 
 ################################################################################
 # OTHER GLOBALS

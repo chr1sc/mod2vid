@@ -1,3 +1,9 @@
+_info() {
+	echo "mod2vid __VERSION__"
+	echo "Usage: ${0##*/} [OPTIONS] <modfile>"
+	echo "Use --help for more infos."
+	exit 2
+}
 
 usage() {
 	cat <<EOF
@@ -15,13 +21,14 @@ Options:
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
+  -o, --output-file <file>   Save the final video to this file
   -t, --title "text"         Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
   -n, --normalize            Amplify to 0dbFS
   -c, --columns <width>      Terminal width in characters (default: 80)
   -r, --rows <height>        Terminal height in characters (default: 24)
-  -d, --delay <seconds>      Delay before recording starts (0.1-5, default: $DELAY)
+  -d, --delay <seconds>      Delay before recording starts (default: $DELAY)
   -s, --skip-term            Skip terminal recording if _term.mp4 exists
   -N, --no-metadata          Strip all metadata from output video
   -Q, --no-trackinfo         If no background was specified, the video will
@@ -48,6 +55,7 @@ parse_args() {
 				BACKGROUND_IMAGE_CMDLINE="$2"
 				shift 2 ;;
 			-i|--input-audio) CUSTOM_WAV="$2"; AUDIO="$2"; shift 2 ;;
+			-o|--output-file) OUTVID_CMDLINE="$2"; shift 2 ;;
 			-S|--subtitle-file) SUBTITLE_FILE="$2"; shift 2 ;;
 			-t|--title)
 				TITLE_TEXT="$2"
@@ -181,11 +189,7 @@ validate_template_variables() {
 	TERM_FONT_SIZE=$(check_bounds "$TERM_FONT_SIZE" 6 36)
 }
 
-validate_args() {
-	if [[ ! -f "$TITLE_FONT_FILE" ]]; then
-		warn "Font file not found: $TITLE_FONT_FILE (using default)"
-	fi
-
+include_settings_file() {
 	if [[ -n "$SETTINGS_FILE" ]]; then
 		ensure_file_readable "$SETTINGS_FILE"
 		if head -n 1 "$SETTINGS_FILE" | grep -q "^# mod2vid template"; then
@@ -194,78 +198,9 @@ validate_args() {
 			die "'$SETTINGS_FILE' is not a valid mod2vid settings file (missing header '# mod2vid template')." 1
 		fi
 	fi
+}
 
-	# command line arguments override template settings
-	handle_cmdline_overrides
-
-	validate_template_variables
-
-	#get the module name
-	if [[ ${#POSITIONAL[@]} -gt 0 ]]; then
-		MODULE="${POSITIONAL[0]}"
-		if [[ ${#POSITIONAL[@]} -gt 1 ]]; then
-			warn "Extra arguments ignored: ${POSITIONAL[*]:1}"
-		fi
-	fi
-
-	# no module nor -p: print usage
-	[[ -z "$MODULE" && "$PRINT_SETTINGS" -ne 1 ]] && {
-		echo "mod2vid __VERSION__"
-		echo "Usage: ${0##*/} [OPTIONS] <modfile>"
-		echo "Use --help for more infos."
-		exit 2
-	}
-
-	# only handle module if given as arg
-	if [[ -n "$MODULE" ]]; then
-		ensure_file_readable "$MODULE"
-		BASENAME="${MODULE%.*}"
-		WAV="${MODULE}.wav"
-		# get the module and track info (-t)
-		TRACK_INFO=$(read_openmpt_info "$MODULE");
-	fi
-
-	[[ -z "$CUSTOM_WAV" ]] && AUDIO="$WAV"
-
-	if [[ $NORMALIZE -eq 1 && -n $CUSTOM_WAV ]]; then
-		warn "Will not normalize (-n) pre-recorded (-i) audio files"
-	fi
-	if [[ $NORMALIZE -eq 1 && $GAIN -ne 0 && $SUPPRESS_AUDIO -eq 0 ]]; then
-		die "Normalize (-n) and Gain (-g) collision" 2
-	fi
-	[[ -z "$TITLE_TEXT" ]] && {
-		TITLE_TEXT="$(basename "${BASENAME//_/ }")"
-	}
-
-	# XXX hate to have this inside the validation function
-	TERMVID="${BASENAME}_term.mp4"
-	OUTVID="${BASENAME}.mp4"
-	GEOM="${TERMINAL_COLS}x${TERMINAL_ROWS}"
-
-	TITLE_TEXT="$(build_text "$TITLE_TEXT")"
-	TITLE_TEXT="$(escape_text_for_ffmpeg "$TITLE_TEXT")"
-	[[ -n "$MODULE" ]] && echo "${YELLOW}TITLE TEXT: $TITLE_TEXT${RESET}"
-
-	if [[ -n "$LOGO_FILE" ]]; then
-		ensure_file_readable "$LOGO_FILE"
-	fi
-	if [[ -n "$SUBTITLE_FILE" ]]; then
-		ensure_file_readable "$SUBTITLE_FILE"
-	fi
-	if ! [[ "$GAIN" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
-		die "Gain is not a valid number" 2
-	fi
-	# just some arbitrary bounds
-	if ! bc <<< "$GAIN >= -80 && $GAIN <= 80" | grep -q 1; then
-		die "Gain is out of range (-80..80)" 2
-	fi
-	# ditto
-	if (( $(bc <<< "$DELAY < $MIN_DELAY || $DELAY > $MAX_DELAY") )); then
-		die "Delay value must be between $MIN_DELAY and $MAX_DELAY seconds" 2
-	fi
-
-	[[ -n "$MODULE" ]] && select_background_image
-
+validate_freqwav_settings() {
 	case "$FREQ_MODE" in
 		bar|dot|line) ;;
 		*)
@@ -305,6 +240,93 @@ validate_args() {
 		warn "FREQ_TRANSPOSE='$FREQ_TRANSPOSE' invalid falling back to default 0"
 		FREQ_TRANSPOSE=0
 	fi
+}
+
+# TODO This is a monster
+validate_args() {
+	if [[ ! -f "$TITLE_FONT_FILE" ]]; then
+		warn "Font file not found: $TITLE_FONT_FILE (using default)"
+	fi
+
+	include_settings_file
+
+	# command line arguments override template settings
+	handle_cmdline_overrides
+
+	validate_template_variables
+
+	#get the module name
+	if [[ ${#POSITIONAL[@]} -gt 0 ]]; then
+		MODULE="${POSITIONAL[0]}"
+		if [[ ${#POSITIONAL[@]} -gt 1 ]]; then
+			warn "Extra arguments ignored: ${POSITIONAL[*]:1}"
+		fi
+	fi
+
+	# no module nor -p: print info
+	[[ -z "$MODULE" && "$PRINT_SETTINGS" -ne 1 ]] && {
+		_info
+	}
+
+	# only handle module if given as arg
+	if [[ -n "$MODULE" ]]; then
+		ensure_file_readable "$MODULE"
+		BASENAME="${MODULE%.*}"
+		WAV="${MODULE}.wav"
+		# get the module and track info (-t)
+		TRACK_INFO=$(read_openmpt_info "$MODULE");
+	fi
+
+	[[ -z "$CUSTOM_WAV" ]] && AUDIO="$WAV"
+
+	if [[ $NORMALIZE -eq 1 && -n $CUSTOM_WAV ]]; then
+		warn "Will not normalize (-n) pre-recorded (-i) audio files"
+	fi
+	if [[ $NORMALIZE -eq 1 && $GAIN -ne 0 && $SUPPRESS_AUDIO -eq 0 ]]; then
+		die "Normalize (-n) and Gain (-g) collision" 2
+	fi
+	[[ -z "$TITLE_TEXT" ]] && {
+		TITLE_TEXT="$(basename "${BASENAME//_/ }")"
+	}
+
+	# XXX hate to have this inside the validation function
+	TERMVID="${BASENAME}_term.mp4"
+	OUTVID="${BASENAME}.mp4"
+	if [[ -n "$OUTVID_CMDLINE" ]]; then
+		OUTVID="$OUTVID_CMDLINE"
+	fi
+
+	GEOM="${TERMINAL_COLS}x${TERMINAL_ROWS}"
+
+	TITLE_TEXT="$(build_text "$TITLE_TEXT")"
+	TITLE_TEXT="$(escape_text_for_ffmpeg "$TITLE_TEXT")"
+	[[ -n "$MODULE" ]] && echo "${YELLOW}TITLE TEXT: $TITLE_TEXT${RESET}"
+
+	if [[ -n "$LOGO_FILE" ]]; then
+		ensure_file_readable "$LOGO_FILE"
+	fi
+	if [[ -n "$SUBTITLE_FILE" ]]; then
+		ensure_file_readable "$SUBTITLE_FILE"
+	fi
+	if ! [[ "$GAIN" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+		die "Gain is not a valid number" 2
+	fi
+	# just some arbitrary bounds
+	if ! bc <<< "$GAIN >= -80 && $GAIN <= 80" | grep -q 1; then
+		die "Gain is out of range (-80..80)" 2
+	fi
+	# ditto
+	if (( $(bc <<< "$DELAY < $MIN_DELAY || $DELAY > $MAX_DELAY") )); then
+		die "Delay value must be between $MIN_DELAY and $MAX_DELAY seconds" 2
+	fi
+
+	[[ -n "$MODULE" ]] && select_background_image
+
+	# will only validate if used
+	if (( SHOW_FREQ == 1 )); then
+		validate_freqwav_settings
+	fi
+
 	case "$SPECTRUM_COLOR" in
 		channel|intensity|rainbow|moreland|nebulae|fire|fiery|fruit|cool|magma|green|viridis|plasma|cividis|terrain)
 			;;

@@ -71,6 +71,27 @@ And that's it - this should have created your video. Now the situation in the cr
 
 You can keep the `<modname>_term.mp4` in case you want to make some changes to the video. If the file is present and the `-s` ("**s**kip screen capture") is set, the program will directly skip to the final render.
 
+## Creating a New Template
+
+Redirecting the output of `mod2vid -p` to a new file will write the variables with their default values into that file. The first line must start with "`# mod2vid template`", otherwise the program will not execute it.
+
+Open the file in a text editor and modify the values. If you want to have some randomness for batch processing you can create an array of images and/or videos with the variable `BACKGROUND_IMAGE_POOL`:
+
+```bash
+BACKGROUND_IMAGE_POOL=(
+	image1.jpg
+	video1.mp4
+)
+```
+
+This array needs at least two values, otherwise it will be ignored. spaces around `=` are not allowed in Bash.
+
+If this array is set contains of at least two filenames, one is chosen randomly and the program checks if the file exists. If there are no absolute path names, it will first look relative to the location of the settings file, and if not found relative to the directory where the program is executed.
+
+In case you only have one background image use the `BACKGROUND_IMAGE` variable. If you don't want to have any background use the `BACKGROUND_COLOR` variable and do not define the `BACKGROUND_IMAGE_POOL` or `BACKGROUND_IMAGE` variables (comment them out if necessary.
+
+The `BACKGROUND_COLOR` has a command for ImageMagick’s `convert` tool, like `gradient:#RRGGBB-#RRGGBB` for a color gradient or `xc:#RRGGBB` for a single color background. You can also use words for colors.
+
 ## Command Line Options
 
 ### Title Templates
@@ -120,6 +141,7 @@ Options:
   -i, --input-audio <file>   Use custom audio file instead of rendering module
                              (Useful for tracks with VST plugins that need
                              to be rendered in OpenMPT first)
+  -o, --output-file <file>   Save the final video to this file
   -t, --title "text"         Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)

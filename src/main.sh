@@ -13,7 +13,6 @@ main() {
 	check_environment
 	parse_args "$@"
 	validate_args
-	check_environment
 	render_audio
 	record_terminal
 	compose_final_video
