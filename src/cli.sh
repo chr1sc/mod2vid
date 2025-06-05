@@ -25,10 +25,10 @@ Options:
   -t, --title "text"         Text overlay displayed at top of video
   -S, --subtitle-file <file> Play a subtitle file (.ass)
   -g, --gain <db>            Amplify output by <db> (0-10, default: 0)
-  -n, --normalize            Amplify to 0dbFS
+  -n, --normalize            Amplify to 0dB
   -c, --columns <width>      Terminal width in characters (default: 80)
   -r, --rows <height>        Terminal height in characters (default: 24)
-  -d, --delay <seconds>      Delay before recording starts (default: $DELAY)
+  -d, --delay <seconds>      Delay before recording starts (default: $DEFAULT_DELAY)
   -s, --skip-term            Skip terminal recording if _term.mp4 exists
   -N, --no-metadata          Strip all metadata from output video
   -Q, --no-trackinfo         If no background was specified, the video will
@@ -39,7 +39,7 @@ Options:
 
 Examples:
   ${0##*/} song.it -t "Epic Track" -n
-  ${0##*/} -i final.wav -b background.jpg song.mptm
+  ${0##*/} -i final.wav -b background.jpg song.mptm -o final_song.mp4
   ${0##*/} --title "{artist} - {title}" module.mod
   ${0##*/} -t "Retro" -c 100 -r 30 song.it
 EOF
@@ -242,7 +242,6 @@ validate_freqwav_settings() {
 	fi
 }
 
-# TODO This is a monster
 validate_args() {
 	if [[ ! -f "$TITLE_FONT_FILE" ]]; then
 		warn "Font file not found: $TITLE_FONT_FILE (using default)"
@@ -289,7 +288,6 @@ validate_args() {
 		TITLE_TEXT="$(basename "${BASENAME//_/ }")"
 	}
 
-	# XXX hate to have this inside the validation function
 	TERMVID="${BASENAME}_term.mp4"
 	OUTVID="${BASENAME}.mp4"
 	if [[ -n "$OUTVID_CMDLINE" ]]; then

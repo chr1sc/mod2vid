@@ -41,3 +41,4 @@ if ! "$OUT" --help >/dev/null 2>&1; then
 fi
 
 echo "Syntax OK, smoke test passed"
+

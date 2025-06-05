@@ -291,3 +291,4 @@ generate_track_info_image() {
 		die "Error: Failed to create image with convert" 1
 	fi
 }
+

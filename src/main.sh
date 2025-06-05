@@ -7,7 +7,7 @@ source "$DIR/env.sh"
 source "$DIR/title_templates.sh"
 source "$DIR/terminal.sh"
 source "$DIR/media.sh"
-source "$DIR/cli.sh
+source "$DIR/cli.sh"
 
 main() {
 	check_environment
