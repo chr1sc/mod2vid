@@ -7,9 +7,7 @@ readonly MAX_DELAY=10.0
 readonly MIN_DELAY=-9.9
 
 # DELAY
-# This value is important.  Depending on the speed of your computer, this
-# value may need to be increased (for slower computers) or set lower (for
-# faster ones). It refers to the wait time between opening an xterm
+# This value is important. It refers to the wait time between opening an xterm
 # window and starting openmpt123. The terminal video recorded here may
 # be asynchronous in the final video accordingly. You can modify the
 # value with the --delay|-d option or set it with DELAY

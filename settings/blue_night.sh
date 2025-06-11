@@ -31,7 +31,7 @@ TITLE_TEXT_POSITION="x=20:y=40"
 
 # wide and flat (calculate rows*2 to get an approx aspect ratio ~ 25/8)
 TERMINAL_COLS=100
-TERMINAL_ROWS=16
+TERMINAL_ROWS=24
 
 SHOW_WAVES=0
 # the pattern view has a height of 800px the width will adjust automatically

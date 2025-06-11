@@ -187,6 +187,7 @@ render_audio() {
 	# user provided an audio file (-i): Do nothing
 	[[ -n "$CUSTOM_WAV" ]] && {
 		echo "Using provided audio: $CUSTOM_WAV"
+		WAV="$CUSTOM_WAV"
 		return
 	}
 
